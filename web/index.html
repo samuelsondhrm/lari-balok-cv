@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lari Balok CV</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div>
+        <h1>Lari Balok <span>CV</span></h1>
+        <p>Wasit bantu berbasis computer vision</p>
+      </div>
+    </div>
+    <div class="meta">
+      <span id="live" class="pill">● MEMUAT</span>
+      <span id="fps" class="pill subtle"></span>
+    </div>
+    <div class="clock-wrap">
+      <span class="clock-label">WAKTU LOMBA</span>
+      <output id="clock" class="clock">00:00.00</output>
+    </div>
+    <nav class="actions" aria-label="Kendali lomba">
+      <button id="btnCalib" class="btn ghost">Kalibrasi</button>
+      <button id="btnStart" class="btn primary">Mulai</button>
+      <button id="btnEnd" class="btn ghost">Selesai</button>
+      <button id="btnReset" class="btn ghost">Reset</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="frame">
+        <img id="video" src="/stream" alt="Video kamera dengan garis lintasan dan kerangka pemain">
+        <svg id="marks" class="marks" preserveAspectRatio="none" hidden></svg>
+      </div>
+      <div id="hint" class="hint" hidden></div>
+      <div id="countdown" class="countdown" hidden aria-live="assertive"></div>
+      <div id="toasts" class="toasts" aria-live="polite"></div>
+    </section>
+
+    <aside id="board" class="board">
+      <h2>Papan Skor</h2>
+      <ol id="lanes" class="lanes"></ol>
+      <h2>Kejadian</h2>
+      <ul id="log" class="log"></ul>
+      <p class="legend"><i class="lg ok"></i>aman <i class="lg warn"></i>menyentuh (&lt;100 ms) <i class="lg bad"></i>pelanggaran</p>
+    </aside>
+
+    <aside id="calib" class="board calib" hidden>
+      <h2>Kalibrasi Arena</h2>
+      <ol class="steps">
+        <li id="st1"><b>1</b><div><strong>Titik lantai</strong><span id="ptsInfo"></span></div></li>
+        <li id="st2" class="done"><b>2</b><div><strong>Ukuran arena</strong>
+          <label>Jumlah lintasan <select id="inLanes"><option>1</option><option>2</option><option>3</option></select></label>
+          <label>Panjang lintasan (m) <input id="inLen" type="number" min="1" max="50" step="0.5"></label>
+          <label>Tinggi balok (cm) <input id="inBlock" type="number" min="2" max="50" step="0.5"></label>
+        </div></li>
+        <li id="st3"><b>3</b><div><strong>Warna balok</strong><span id="colorInfo"></span></div></li>
+      </ol>
+      <div class="calib-actions">
+        <button id="btnRedo" class="btn ghost">Ulangi titik</button>
+        <button id="btnColor" class="btn ghost">Ambil warna balok</button>
+        <button id="btnCalCancel" class="btn ghost">Batal</button>
+        <button id="btnCalSave" class="btn primary">Simpan</button>
+      </div>
+      <p class="note">Pratinjau: pita berwarna = lintasan, garis putih = START, garis kotak-kotak = FINIS,
+        magenta = piksel yang dikenali sebagai warna balok, kotak putih = balok terdeteksi.</p>
+    </aside>
+  </main>
+
+  <dialog id="review" class="review">
+    <header>
+      <div><span id="rvLane" class="badge"></span><h3 id="rvTitle">Tinjau</h3></div>
+      <button id="rvClose" class="icon" aria-label="Tutup">✕</button>
+    </header>
+    <div class="rv-view"><img id="rvImg" alt="Frame klip bukti"></div>
+    <div class="rv-bar">
+      <button id="rvPrev" class="btn ghost" title="Frame sebelumnya (←)">◀ 1 frame</button>
+      <button id="rvPlay" class="btn ghost" title="Putar / jeda (spasi)">Putar</button>
+      <button id="rvNext" class="btn ghost" title="Frame berikutnya (→)">1 frame ▶</button>
+      <input id="rvSlider" type="range" min="0" value="0" aria-label="Posisi frame">
+      <output id="rvTime" class="rv-time"></output>
+    </div>
+    <footer id="rvDecide">
+      <span id="rvStatus" class="muted"></span>
+      <button id="rvBatal" class="btn danger">Batalkan pelanggaran</button>
+      <button id="rvSah" class="btn primary">Sahkan</button>
+    </footer>
+  </dialog>
+
+  <div id="podium" class="podium" hidden>
+    <div class="podium-card" role="dialog" aria-labelledby="podiumTitle">
+      <h2 id="podiumTitle">Hasil Lomba</h2>
+      <div id="podiumStage" class="podium-stage"></div>
+      <ul id="podiumRest" class="podium-rest"></ul>
+      <button id="podiumClose" class="btn primary">Tutup</button>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
