@@ -1,0 +1,5 @@
+# Pasang PyTorch lebih dulu (versi CUDA atau CPU, lihat README), lalu: pip install -r requirements.txt
+ultralytics>=8.3
+lap>=0.5
+opencv-python>=4.8
+numpy>=1.24
