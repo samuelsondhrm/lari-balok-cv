@@ -2,7 +2,7 @@
 
     python app.py --source 0            # kamera USB/webcam indeks 0
     python app.py --source rekaman.mp4  # file video
-lalu buka http://localhost:8000
+lalu buka http://localhost:8000 (sumber bisa diganti atau ditambah dari dashboard)
 """
 import argparse
 import json
@@ -30,6 +30,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.stream()
         if path == "/api/state":
             return self.send(200, self.pipe.state().encode(), TYPES[".json"])
+        if path == "/api/sources":
+            return self.send(200, self.pipe.sources().encode(), TYPES[".json"])
         if path == "/api/snapshot":
             jpg = self.pipe.snapshot("draft=1" in query)
             return self.send(200, jpg, TYPES[".jpg"]) if jpg else self.send_error(503)
@@ -81,7 +83,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser(description="Lari Balok CV: wasit bantu berbasis computer vision.")
-    ap.add_argument("--source", default="0", help="indeks kamera (0, 1, ...) atau path file video")
+    ap.add_argument("--source", default="0", help="sumber awal: indeks kamera, URL kamera HP/IP, atau path video")
     ap.add_argument("--model", default="yolo11s-pose.pt",
                     help="bobot YOLO11-pose; yolo11n-pose.pt untuk laptop tanpa GPU")
     ap.add_argument("--imgsz", type=int, default=1280,

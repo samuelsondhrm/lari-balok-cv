@@ -94,49 +94,96 @@ class Recorder:
         self.thread.join()
 
 
+def canonical(source):
+    """Validate a source typed in the dashboard or CLI -> (source, kind), kind = kamera | stream | file."""
+    s = str(source).strip().strip('"')  # Windows "Copy as path" wraps paths in quotes
+    if not s or len(s) > 500:
+        raise ValueError("Isi sumber video: indeks kamera, URL kamera, atau path file video.")
+    if s.isdecimal():
+        if int(s) > 20:
+            raise ValueError("Indeks kamera 0-20.")
+        return str(int(s)), "kamera"
+    if "://" in s:
+        if s.split("://", 1)[0].lower() not in ("http", "https", "rtsp", "rtmp"):
+            raise ValueError("URL kamera harus diawali http://, https://, rtsp://, atau rtmp://.")
+        return s, "stream"
+    p = Path(s).expanduser().resolve()
+    if not p.is_file():
+        raise ValueError(f"File video tidak ditemukan: {s}")
+    return str(p), "file"
+
+
+def open_capture(src, kind):
+    """Open a source and make sure it delivers a frame; raises ValueError otherwise."""
+    if kind == "kamera":  # DirectShow + MJPG lets common USB webcams deliver 1080p at 30 fps on Windows
+        cap = cv2.VideoCapture(int(src), cv2.CAP_DSHOW)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+    elif kind == "stream":  # give up within seconds instead of hanging on an unreachable phone/IP camera
+        cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG,
+                               [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000])
+    else:
+        cap = cv2.VideoCapture(src)
+    if not (cap.isOpened() and cap.read()[0]):
+        cap.release()
+        raise ValueError(f"Sumber tidak bisa dibuka atau tidak mengirim gambar: {src}")
+    if kind == "file":
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # the test read consumed the first frame
+    return cap
+
+
 class Pipeline:
     def __init__(self, source, model, imgsz, root):
-        self.source, self.model_name, self.imgsz = str(source), model, imgsz
-        self.is_file = not self.source.isdigit()
-        self.root = Path(root)
+        self.model_name, self.imgsz, self.root = model, imgsz, Path(root)
         self.calib_path, self.runs_dir = self.root / "calibration.json", self.root / "runs"
-        self.cap = self.open()
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.fps = fps if 1 <= fps <= 240 else 30.0
-        self.size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        try:
+            data = json.loads(self.calib_path.read_text(encoding="utf-8")) if self.calib_path.exists() else {}
+        except ValueError:
+            data = {}
+        # one calibration per source: every camera position has its own floor lines
+        self.calibs = {k: v for k, v in data.items() if isinstance(v, dict)} if isinstance(data, dict) else {}
         self.model = YOLO(model)
         self.cv = threading.Condition()  # guards everything below; notified on every new frame
-        self.jpeg = self.frame = self.frozen = self.draft = None
-        self.calib = self.arena = self.race = None
-        self.t, self.idx, self.rate, self.eof, self.restart = 0.0, 0, 0.0, False, False
+        self.probe = threading.Lock()    # one camera scan at a time
+        self.cap = self.next = self.frozen = self.draft = self.writer = self.run_dir = None
+        self.pending, self.clips, self.used, self.race_id = [], set(), set(), 0
+        try:
+            src, kind = canonical(source)
+            self.install(src, kind, open_capture(src, kind))
+        except ValueError as e:
+            raise SystemExit(str(e))
+
+    def install(self, source, kind, cap):
+        """Make an opened capture the active source and load that source's own calibration."""
+        if self.cap is not None:
+            self.cap.release()
+        self.source, self.kind, self.cap, self.is_file = source, kind, cap, kind == "file"
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        self.fps = fps if 1 <= fps <= 240 else 30.0
+        self.size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         self.ring = collections.deque(maxlen=int(self.fps * (CLIP_BEFORE + CLIP_AFTER + 1)))
-        self.pending, self.clips, self.race_id = [], set(), 0
-        self.writer = self.run_dir = None
-        if self.calib_path.exists():
+        self.t, self.idx, self.rate, self.eof, self.restart = 0.0, 0, 0.0, False, False
+        self.jpeg = self.frame = self.calib = self.arena = self.race = None
+        self.used.add(source)
+        c = self.calibs.get(source)
+        if c:
             try:
-                c = json.loads(self.calib_path.read_text(encoding="utf-8"))
                 if tuple(c["frame_size"]) != self.size:
                     raise ValueError(f"dibuat untuk resolusi {c['frame_size']}, sumber sekarang {list(self.size)}")
                 self.apply(c)
             except (ValueError, KeyError, TypeError) as e:
-                print(f"calibration.json diabaikan ({e}); kalibrasi ulang di dashboard.")
-
-    def open(self):
-        if self.is_file:
-            cap = cv2.VideoCapture(self.source)
-        else:  # DirectShow + MJPG lets common USB webcams deliver 1080p at 30 fps on Windows
-            cap = cv2.VideoCapture(int(self.source), cv2.CAP_DSHOW)
-            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*"MJPG"))
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-            cap.set(cv2.CAP_PROP_FPS, 30)
-        if not cap.isOpened():
-            raise SystemExit(f"Sumber video tidak bisa dibuka: {self.source}")
-        return cap
+                print(f"Kalibrasi untuk {source} diabaikan ({e}); kalibrasi ulang di dashboard.")
 
     def run(self):
         wall0, last = time.perf_counter(), None
         while True:
+            if self.next:  # source switch from the dashboard: swap here, between frames, never mid-read
+                with self.cv:
+                    self.install(*self.next)
+                    self.next = None
+                wall0, last = time.perf_counter(), None
             if self.restart:  # file: play again from the start for a new race
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 self.idx, self.eof, self.restart = 0, False, False
@@ -263,6 +310,8 @@ class Pipeline:
 
     def command(self, c):
         a = c.get("action")
+        if a == "source":  # opening a camera takes ~1 s, so it runs outside the lock
+            return self.switch(c["source"])
         with self.cv:
             if a == "start":
                 if not self.race:
@@ -302,7 +351,8 @@ class Pipeline:
                 d["frame_size"] = list(self.frozen.shape[1::-1])
                 self.reset()  # a new arena starts a new race
                 self.apply(d)
-                self.calib_path.write_text(json.dumps(d, indent=2), encoding="utf-8")
+                self.calibs[self.source] = d
+                self.calib_path.write_text(json.dumps(self.calibs, indent=2), encoding="utf-8")
                 self.frozen = self.draft = None
             elif a == "calib_cancel":
                 self.frozen = self.draft = None
@@ -345,12 +395,59 @@ class Pipeline:
         self.arena = Arena(c["pts"], c["lanes"], c["length_m"], c["block_h_cm"])
         self.calib, self.race = c, Race(self.arena, self.fps)
 
+    def busy(self):
+        if self.race and self.race.state in ("hitung", "berlaga"):
+            return "Tidak bisa ganti sumber saat lomba berjalan."
+        if self.frozen is not None:
+            return "Selesaikan atau batalkan kalibrasi dulu."
+        return None
+
+    def switch(self, source):
+        """Open another camera/stream/file; the pipeline thread installs it between frames."""
+        src, kind = canonical(source)
+        with self.cv:
+            if err := self.busy():
+                raise ValueError(err)
+            if src == self.source:
+                return dict(source=src, kind=kind)
+        cap = open_capture(src, kind)
+        with self.cv:
+            if err := self.busy():  # a race or calibration started while the camera was opening
+                cap.release()
+                raise ValueError(err)
+            self.reset()  # close the current race: clips, recording, result.json
+            if self.next:
+                self.next[2].release()
+            self.next = (src, kind, cap)
+        return dict(source=src, kind=kind)
+
+    def sources(self):
+        """Cameras found by probing indices 0-4, plus files and streams used or calibrated before."""
+        with self.cv:
+            active, size, known, calibrated = self.source, list(self.size), set(self.calibs) | self.used, set(self.calibs)
+        cams = []
+        with self.probe:
+            for i in range(5):
+                if str(i) != active:  # the active camera is busy; probing it could disturb the race feed
+                    cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+                    found = cap.isOpened()
+                    cap.release()
+                    if not found:
+                        continue
+                cams.append(str(i))
+        out = [dict(source=s, kind="kamera") for s in cams]
+        out += [dict(source=s, kind="stream" if "://" in s else "file") for s in sorted(known) if not s.isdecimal()]
+        for o in out:
+            o.update(active=o["source"] == active, calibrated=o["source"] in calibrated,
+                     size=size if o["source"] == active else None)
+        return json.dumps(dict(sources=out))
+
     # ---- read side for the web server ----
 
     def state(self):
         with self.cv:
             return json.dumps(dict(
-                source=self.source, is_file=self.is_file, model=self.model_name, fps=round(self.rate, 1),
+                source=self.source, kind=self.kind, model=self.model_name, fps=round(self.rate, 1),
                 frame=list(self.size), eof=self.eof, calibrating=self.frozen is not None, calib=self.calib,
                 race=self.race.snapshot() if self.race else None, race_id=self.race_id,
                 run=self.run_dir.name if self.run_dir else None, clips=sorted(self.clips)))

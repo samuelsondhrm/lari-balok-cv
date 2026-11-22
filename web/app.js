@@ -56,8 +56,8 @@ async function poll() {
     gotAt = performance.now();
     render();
   } catch {
-    $("#live").textContent = "● TERPUTUS";
-    $("#live").className = "pill";
+    $("#srcBtn").textContent = "● TERPUTUS";
+    $("#srcBtn").className = "pill src";
   }
   setTimeout(poll, 150);
 }
@@ -74,10 +74,9 @@ function render() {
 }
 
 function renderHeader() {
-  const live = $("#live");
-  const name = S.source.split(/[\\/]/).pop();
-  live.textContent = S.is_file ? `▶ VIDEO · ${name}${S.eof ? " · habis" : ""}` : `● LIVE · Kamera ${S.source}`;
-  live.className = `pill ${S.is_file ? "file" : "on"}`;
+  const btn = $("#srcBtn"), file = S.kind === "file", label = srcLabel(S.source, S.kind);
+  btn.textContent = file ? `▶ VIDEO · ${label}${S.eof ? " · habis" : ""}` : `● LIVE · ${label}`;
+  btn.className = `pill src ${file ? "file" : "on"}`;
   $("#fps").textContent = `${Math.round(S.fps)} fps · ${S.model.replace(/\.pt$/, "")}`;
   const st = S.race?.state;
   $("#btnStart").disabled = !S.race || st !== "siap" || S.calibrating || S.eof;
@@ -105,7 +104,7 @@ function renderLanes() {
     setHTML(card.querySelector(".chips"),
       (hidden ? `<span class="chip warn" title="Kaki pemain tidak terlihat kamera; momen ini tidak dinilai">TERTUTUP</span>` : "") +
       `<span class="chip st">${STATUS[l.status]}</span>`);
-    card.querySelector(".bar i").style.width = `${(l.progress * 100).toFixed(1)}%`;
+    card.querySelector(".bar i").style.width = `${l.status === "kosong" ? 0 : (l.progress * 100).toFixed(1)}%`;
     const time = l.finish != null ? fmt(l.finish) : l.status === "berlaga" ? `${Math.round(l.progress * 100)}%` : "—";
     const rank = l.rank ? `<span class="rank r${Math.min(l.rank, 4)}">${l.tie ? "SERI · " : ""}JUARA ${l.rank}</span>` : "";
     setHTML(card.querySelector(".lane-foot"), `<span class="time">${time}</span>${rank}`);
@@ -368,6 +367,54 @@ $("#btnCalSave").onclick = async () => {
 };
 $("#btnCalCancel").onclick = async () => { await api("calib_cancel"); exitCalib(); };
 
+// ---------- video sources: switch to another camera, or add a phone/IP camera or a video file ----------
+let switching = false;
+
+function srcLabel(s, kind) {
+  if (kind === "kamera") return `Kamera ${s}`;
+  if (kind === "file") return s.split(/[\\/]/).pop();
+  try { return new URL(s).host || s; } catch { return s; }
+}
+async function loadSources() {
+  setHTML($("#srcList"), `<li class="muted">Mencari kamera…</li>`);
+  let list = null;
+  try { list = (await (await fetch("/api/sources", { cache: "no-store" })).json()).sources; } catch { /* shown below */ }
+  if (!list) return setHTML($("#srcList"), `<li class="muted">Gagal memuat daftar sumber.</li>`);
+  const tag = { kamera: "KAMERA", stream: "IP", file: "VIDEO" };
+  setHTML($("#srcList"), list.map((s) => {
+    const meta = [s.active && "aktif", s.size && `${s.size[0]}×${s.size[1]}`, s.calibrated ? "terkalibrasi" : "belum dikalibrasi"]
+      .filter(Boolean).join(" · ");
+    return `<li><button class="src-item${s.active ? " active" : ""}" data-source="${esc(s.source)}" title="${esc(s.source)}" ${s.active ? "disabled" : ""}>
+      <span class="src-tag ${s.kind}">${tag[s.kind]}</span>
+      <span class="src-name"><span>${esc(srcLabel(s.source, s.kind))}</span><small>${meta}</small></span></button></li>`;
+  }).join("") || `<li class="muted">Tidak ada kamera terdeteksi.</li>`);
+}
+function toggleSources(open) {
+  const panel = $("#srcPanel");
+  open ??= panel.hidden;
+  panel.hidden = !open;
+  $("#srcBtn").setAttribute("aria-expanded", String(open));
+  if (open) loadSources();
+}
+async function useSource(source) {
+  if (switching || !source.trim()) return;
+  switching = true;
+  toast("Membuka sumber video…");
+  try {
+    const j = await api("source", { source });
+    if (!j.ok) return;
+    toggleSources(false);
+    $("#srcInput").value = "";
+    toast(`Sumber aktif: ${srcLabel(j.source, j.kind)}`, "ok");
+  } finally {
+    switching = false;
+  }
+}
+$("#srcBtn").onclick = () => toggleSources();
+$("#srcScan").onclick = loadSources;
+$("#srcAdd").onsubmit = (e) => { e.preventDefault(); useSource($("#srcInput").value); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#srcPanel").hidden) toggleSources(false); });
+
 // ---------- race controls ----------
 $("#btnCalib").onclick = () => { ensureAudio(); calibBegin(); };
 $("#btnStart").onclick = () => { ensureAudio(); api("start"); };
@@ -378,6 +425,9 @@ document.addEventListener("pointerdown", ensureAudio);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-review]");
   if (b && !b.disabled) openReview(b.dataset.review);
+  const s = e.target.closest("[data-source]");
+  if (s && !s.disabled) useSource(s.dataset.source);
+  if (!$("#srcPanel").hidden && !e.target.closest(".src-wrap")) toggleSources(false); // click outside closes it
 });
 $("#rvPrev").onclick = () => { stopPlay(); showFrame(rv.idx - 1); };
 $("#rvNext").onclick = () => { stopPlay(); showFrame(rv.idx + 1); };

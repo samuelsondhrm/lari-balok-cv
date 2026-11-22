@@ -16,7 +16,23 @@
       </div>
     </div>
     <div class="meta">
-      <span id="live" class="pill">● MEMUAT</span>
+      <div class="src-wrap">
+        <button id="srcBtn" class="pill src" aria-haspopup="true" aria-expanded="false" title="Ganti atau tambah sumber video">● MEMUAT</button>
+        <div id="srcPanel" class="src-panel" hidden>
+          <div class="src-head">
+            <strong>Sumber video</strong>
+            <button id="srcScan" class="btn mini ghost" type="button">Cari kamera</button>
+          </div>
+          <ul id="srcList" class="src-list"></ul>
+          <form id="srcAdd" class="src-add">
+            <input id="srcInput" autocomplete="off" spellcheck="false" aria-label="Sumber video baru"
+                   placeholder="Indeks, URL kamera, atau path video">
+            <button class="btn mini primary">Tambah</button>
+          </form>
+          <p class="note">Contoh: <code>2</code> · <code>http://192.168.1.5:8080/video</code> · <code>D:\uji\lomba1.mp4</code><br>
+            Setiap sumber menyimpan kalibrasinya sendiri. Ganti sumber hanya saat tidak ada lomba berjalan.</p>
+        </div>
+      </div>
       <span id="fps" class="pill subtle"></span>
     </div>
     <div class="clock-wrap">
@@ -64,7 +80,7 @@
       <div class="calib-actions">
         <button id="btnRedo" class="btn ghost">Ulangi titik</button>
         <button id="btnColor" class="btn ghost">Ambil warna balok</button>
-        <button id="btnCalCancel" class="btn ghost">Batal</button>
+        <button id="btnCalCancel" class="btn danger">Batal</button>
         <button id="btnCalSave" class="btn primary">Simpan</button>
       </div>
       <p class="note">Pratinjau: pita berwarna = lintasan, garis putih = START, garis kotak-kotak = FINIS,

@@ -35,11 +35,20 @@ Laptop tanpa GPU NVIDIA: pasang `pip install torch torchvision` (versi CPU), lal
 ## Menjalankan
 
 ```powershell
-python app.py --source 0                # kamera indeks 0 (kamera USB eksternal biasanya 1)
-python app.py --source samples\uji.mp4  # file video, diputar dengan kecepatan asli
+python app.py                           # mulai dengan kamera indeks 0
+python app.py --source samples\uji.mp4  # atau mulai dari file video (diputar dengan kecepatan asli)
 ```
 
 Setelah itu buka **http://localhost:8000**. Untuk proyektor, tekan F11 agar layar penuh.
+
+**Ganti atau tambah kamera** langsung dari dashboard: klik pil sumber di header (mis. `● LIVE · Kamera 0 ▾`), lalu:
+
+- pilih salah satu kamera yang terdeteksi; atau
+- ketik sumber baru lalu tekan **Tambah**. Sumber bisa berupa indeks kamera, URL kamera HP/IP, atau path video.
+  Contoh URL dari aplikasi IP Webcam di Android: `http://<ip-hp>:8080/video`.
+
+Indeks kamera tidak selalu 0 dan 1, jadi pilih saja dari daftar. Setiap sumber menyimpan kalibrasinya sendiri di
+`calibration.json`. Sumber hanya bisa diganti saat tidak ada lomba berjalan.
 
 ## Prosedur di hari lomba
 
@@ -136,4 +145,5 @@ Setiap lomba menghasilkan folder `runs/<tanggal_jam>/` berisi:
   otomatis dengan deteksi warna, lalu tinggal dikoreksi.
 - **Durasi rekaman.** `race.mp4` ditulis pada fps nominal. Jika laptop menjatuhkan frame, durasi
   video bisa sedikit lebih pendek dari durasi lomba. Waktu resmi tetap diambil dari timestamp frame.
-- **Belum tersedia:** kamera kedua, deteksi false start, dan penilaian teknik memindah balok.
+- **Belum tersedia:** penilaian dengan dua kamera sekaligus (sumber bisa diganti, tetapi yang dinilai satu per satu),
+  deteksi false start, dan penilaian teknik memindah balok.

@@ -60,6 +60,41 @@ h1 span { color: var(--accent); }
 .pill.file { color: #d6e4ff; background: rgba(59, 130, 246, 0.16); border-color: rgba(59, 130, 246, 0.45); }
 .pill.subtle:empty { display: none; }
 
+/* source picker: the header pill opens it */
+.src-wrap { position: relative; }
+.pill.src { font-family: inherit; cursor: pointer; }
+.pill.src::after { content: " ▾"; }
+.pill.src:hover { filter: brightness(1.2); }
+.src-panel {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 30;
+  display: grid; gap: 10px; width: 390px; padding: 14px;
+  border-radius: 14px; background: #0d1b42; border: 1px solid var(--line);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+.src-head { display: flex; align-items: center; justify-content: space-between; }
+.src-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 280px; overflow: auto; }
+.src-list .muted { padding: 8px; font-size: 13px; color: var(--muted); }
+.src-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
+  border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03);
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.src-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+.src-item.active { cursor: default; border-color: rgba(245, 158, 11, 0.65); background: rgba(245, 158, 11, 0.1); }
+.src-tag { flex: none; padding: 3px 6px; border-radius: 5px; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: #bfdbfe; background: rgba(59, 130, 246, 0.24); }
+.src-tag.stream { color: #e9d5ff; background: rgba(168, 85, 247, 0.24); }
+.src-tag.file { color: var(--muted); background: rgba(255, 255, 255, 0.1); }
+.src-name { display: flex; flex-direction: column; min-width: 0; font-weight: 700; }
+.src-name span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.src-name small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.src-add { display: flex; gap: 8px; }
+.src-add input {
+  flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; font: inherit; font-size: 13px;
+  color: var(--text); background: #0a1533; border: 1px solid var(--line);
+}
+.src-add input:focus { outline: 2px solid var(--accent-hi); outline-offset: 1px; }
+.note code { padding: 1px 5px; border-radius: 4px; font-size: 11px; color: var(--text); background: rgba(255, 255, 255, 0.08); }
+
 .clock-wrap { display: flex; flex-direction: column; align-items: flex-end; min-width: 170px; }
 .clock-label { font-size: 10px; letter-spacing: 0.22em; color: var(--muted); }
 .clock { font-size: 36px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
@@ -83,8 +118,12 @@ h1 span { color: var(--accent); }
 }
 .btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #fde68a, #fbbf24); }
 .btn.primary:disabled { color: var(--muted); background: rgba(255, 255, 255, 0.06); border-color: var(--line); box-shadow: none; }
-.btn.danger { color: #fecaca; background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.45); }
-.btn.danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.26); }
+.btn.danger {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.32);
+}
+.btn.danger:hover:not(:disabled) { background: linear-gradient(180deg, #f87171, #ef4444); }
 .btn.mini { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
 .btn.active { border-color: var(--accent); color: var(--accent-hi); background: rgba(245, 158, 11, 0.12); }
 
