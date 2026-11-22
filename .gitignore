@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pt
+# race recordings and test videos show players' faces; this repo is public
+runs/
+samples/
+calibration.json
